@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Gemini Chatbot Test</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0c0c0f;
+      color: #e8e8f0;
+      font-family: 'Syne', sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 700px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      height: 90vh;
+    }
+
+    h1 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: #7c5cfc;
+      letter-spacing: -0.5px;
+    }
+
+    .key-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    input[type="password"], input[type="text"] {
+      flex: 1;
+      background: #14141a;
+      border: 1px solid #22222e;
+      border-radius: 10px;
+      padding: 10px 14px;
+      color: #e8e8f0;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.85rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input:focus { border-color: #7c5cfc; }
+
+    button.set-key {
+      background: #7c5cfc;
+      border: none;
+      border-radius: 10px;
+      padding: 10px 18px;
+      color: #fff;
+      font-family: 'Syne', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    button.set-key:hover { opacity: 0.85; }
+
+    .status {
+      font-size: 0.78rem;
+      color: #6b6b80;
+      font-family: 'DM Mono', monospace;
+    }
+
+    .status.ok  { color: #4caf7d; }
+    .status.err { color: #f44; }
+
+    .chat-box {
+      flex: 1;
+      background: #14141a;
+      border: 1px solid #22222e;
+      border-radius: 14px;
+      padding: 20px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .msg {
+      max-width: 80%;
+      padding: 12px 16px;
+      border-radius: 12px;
+      font-size: 0.92rem;
+      line-height: 1.6;
+      white-space: pre-wrap;
+    }
+
+    .msg.user {
+      background: #7c5cfc;
+      color: #fff;
+      align-self: flex-end;
+      border-bottom-right-radius: 3px;
+    }
+
+    .msg.ai {
+      background: #1e1e28;
+      color: #e8e8f0;
+      align-self: flex-start;
+      border-bottom-left-radius: 3px;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.85rem;
+    }
+
+    .msg.thinking {
+      background: #1e1e28;
+      color: #6b6b80;
+      align-self: flex-start;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.85rem;
+      animation: pulse 1.2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .input-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    .input-row input {
+      flex: 1;
+      font-family: 'Syne', sans-serif;
+      font-size: 0.95rem;
+    }
+
+    button.send {
+      background: #7c5cfc;
+      border: none;
+      border-radius: 10px;
+      padding: 10px 20px;
+      color: #fff;
+      font-family: 'Syne', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    button.send:hover  { opacity: 0.85; }
+    button.send:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .empty-hint {
+      margin: auto;
+      color: #2e2e3e;
+      font-size: 0.85rem;
+      font-family: 'DM Mono', monospace;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>⚡ Gemini API Test</h1>
+
+    <div class="key-row">
+      <input type="password" id="apiKey" placeholder="Paste your Gemini API key here (not saved anywhere)"/>
+      <button class="set-key" onclick="setKey()">Set Key</button>
+    </div>
+    <div class="status" id="status">No key set — paste your key above to begin.</div>
+
+    <div class="chat-box" id="chatBox">
+      <div class="empty-hint" id="hint">Set your API key, then start chatting.</div>
+    </div>
+
+    <div class="input-row">
+      <input type="text" id="userInput" placeholder="Type a message..." onkeydown="if(event.key==='Enter') sendMessage()"/>
+      <button class="send" id="sendBtn" onclick="sendMessage()" disabled>Send</button>
+    </div>
+  </div>
+
+  <script>
+    let API_KEY = "";
+    let history = [];
+
+    function setKey() {
+      const val = document.getElementById("apiKey").value.trim();
+      if (!val) { setStatus("Please paste a valid key.", "err"); return; }
+      API_KEY = val;
+      document.getElementById("apiKey").value = "";
+      document.getElementById("sendBtn").disabled = false;
+      setStatus("✓ Key set — only in memory, not saved anywhere.", "ok");
+    }
+
+    function setStatus(msg, type) {
+      const el = document.getElementById("status");
+      el.textContent = msg;
+      el.className = "status " + (type || "");
+    }
+
+    function appendMsg(role, text) {
+      const hint = document.getElementById("hint");
+      if (hint) hint.remove();
+      const div = document.createElement("div");
+      div.className = "msg " + role;
+      div.textContent = text;
+      if (role === "thinking") div.id = "thinking-msg";
+      document.getElementById("chatBox").appendChild(div);
+      document.getElementById("chatBox").scrollTop = 99999;
+      return div;
+    }
+
+    async function sendMessage() {
+      const input = document.getElementById("userInput");
+      const text = input.value.trim();
+      if (!text || !API_KEY) return;
+
+      input.value = "";
+      document.getElementById("sendBtn").disabled = true;
+
+      appendMsg("user", text);
+      history.push({ role: "user", parts: [{ text }] });
+
+      const thinking = appendMsg("thinking", "Gemini is thinking...");
+
+      try {
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${API_KEY}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ contents: history })
+          }
+        );
+
+        const data = await res.json();
+        thinking.remove();
+
+        if (!res.ok) {
+          appendMsg("ai", "❌ Error: " + (data.error?.message || "Something went wrong."));
+          setStatus("API error — check your key or quota.", "err");
+        } else {
+          const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || "(empty response)";
+          history.push({ role: "model", parts: [{ text: reply }] });
+          appendMsg("ai", reply);
+          setStatus("✓ API is working!", "ok");
+        }
+      } catch (e) {
+        thinking.remove();
+        appendMsg("ai", "❌ Network error: " + e.message);
+        setStatus("Network error.", "err");
+      }
+
+      document.getElementById("sendBtn").disabled = false;
+    }
+  </script>
+</body>
+</html>
